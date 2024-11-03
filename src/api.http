@@ -20,8 +20,10 @@ POST http://localhost:3000/paises
 Content-Type: application/json
 {
   "pais": "Argentina",
-  "idioma": ["Español"],
-  "continente": "América"
+  "idioma": [
+    "Español"
+        ],
+  "continente": "America"
 }
 
 

@@ -26,11 +26,24 @@ app.get('/paises', (req, res) => {
     res.json(paisesPorIdioma);
 });
 
-app.post('/paises', (req, res) => {
-    paises.push(req.body);
-    fs.writeFileSync('./data/countries.json', JSON.stringify(paises));
-    res.json(req.body);
-});
+app.get('/paises/idioma/:idioma', async (req, res) => {
+    const { idioma } = req.params
+    const countries = await req.movies.find({ idioma: {$in: [idioma]} }).toArray()
+    res.json(countries)
+})
+
+app.post('/paises/', async (req,res) => {
+    const nuevoPais = req.body
+    if (nuevoPais === undefined)
+        res.status(400).send('Error en el formato del pais')
+    try {
+        await req.countries.insertOne(nuevoPais)
+        res.status(201).send(nuevoPais)
+    } catch (error) {
+        es.status(500).send('Error al agregar pais')
+    }
+})
+
 
 app.delete('/paises/:nombre', (req, res) => {
     const index = paises.findIndex(p => p.pais === req.params.nombre);
