@@ -1,32 +1,19 @@
-### Obtener todos los países
+# Obtener todos los países
+curl http://localhost:3000/paises
 
-GET http://localhost:3000/paises
+# Filtrar por idioma (query parameter)
+curl http://localhost:3000/paises?idioma=Italiano
 
+# Filtrar por idioma (endpoint específico)
+curl http://localhost:3000/paises/idioma/Italiano
 
-### Obtener los datos de un país en particular (ejemplo: Colombia)
+# Buscar país específico
+curl http://localhost:3000/paises/España
 
-GET http://localhost:3000/paises/Colombia
+# Crear nuevo país
+curl -X POST http://localhost:3000/paises \
+  -H "Content-Type: application/json" \
+  -d '{"pais":"Portugal","idioma":["Portugués"],"continente":"Europa"}'
 
-
-### Obtener todos los países que hablen un idioma específico (ejemplo: italiano)
-
-GET http://localhost:3000/paises?idioma=Italiano
-
-
-### Insertar un nuevo país
-
-POST http://localhost:3000/paises
-
-Content-Type: application/json
-{
-  "pais": "Argentina",
-  "idioma": [
-    "Español"
-        ],
-  "continente": "America"
-}
-
-
-### Borrar un país (ejemplo: Argentina)
-
-DELETE http://localhost:3000/paises/Argentina
+# Eliminar país
+curl -X DELETE http://localhost:3000/paises/España

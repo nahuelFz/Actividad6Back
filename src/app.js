@@ -1,63 +1,142 @@
 const express = require('express');
+const fs = require('fs').promises;
 const app = express();
-const port = 3000;
+const PORT = 3000;
 
-// Middleware para parsear el cuerpo de las solicitudes
 app.use(express.json());
 
-// Leer el archivo JSON con los datos de los países
-const fs = require('fs');
-let paises = JSON.parse(fs.readFileSync('./data/countries.json'));
+// Función auxiliar para leer el archivo data.json
+async function readData() {
+    const data = await fs.readFile('./data/countries.json', 'utf8');
+    return JSON.parse(data);
+}
 
-// Rutas
-app.get('/paises', (req, res) => {
-    res.json(paises);
-});
+// Función auxiliar para escribir en el archivo data.json
+async function writeData(data) {
+    await fs.writeFile('./data/countries.json', JSON.stringify(data, null, 2));
+}
 
-app.get('/paises/:nombre', (req, res) => {
-    const pais = paises.find(p => p.pais === req.params.nombre);
-    res.json(pais || {});
-});
+// Función auxiliar para filtrar países por idioma
+function filtrarPaisesPorIdioma(paises, idiomaBuscado) {
+    return paises.filter(pais => 
+        pais.idioma.some(idioma => 
+            idioma.toLowerCase() === idiomaBuscado.toLowerCase()
+        )
+    );
+}
 
-
-app.get('/paises', (req, res) => {
-    const idioma = req.query.idioma.toLowerCase(); // Convertir el idioma a minúsculas
-    const paisesPorIdioma = paises.filter(p => p.idioma.some(idiomaPais => idiomaPais.toLowerCase() === idioma));
-    res.json(paisesPorIdioma);
-});
-
-app.get('/paises/idioma/:idioma', async (req, res) => {
-    const { idioma } = req.params
-    const countries = await req.movies.find({ idioma: {$in: [idioma]} }).toArray()
-    res.json(countries)
-})
-
-app.post('/paises/', async (req,res) => {
-    const nuevoPais = req.body
-    if (nuevoPais === undefined)
-        res.status(400).send('Error en el formato del pais')
+// GET /paises - Obtener todos los países
+app.get('/paises', async (req, res) => {
     try {
-        await req.countries.insertOne(nuevoPais)
-        res.status(201).send(nuevoPais)
+        const { idioma } = req.query;
+        const data = await readData();
+        
+        if (idioma) {
+            const paisesFiltrados = filtrarPaisesPorIdioma(data, idioma);
+            
+            if (paisesFiltrados.length === 0) {
+                return res.status(404).json({ 
+                    mensaje: `No se encontraron países que hablen ${idioma}`
+                });
+            }
+            
+            return res.json(paisesFiltrados);
+        }
+        
+        res.json(data);
     } catch (error) {
-        es.status(500).send('Error al agregar pais')
+        res.status(500).json({ error: 'Error al leer los datos' });
     }
-})
-
-
-app.delete('/paises/:nombre', (req, res) => {
-    const index = paises.findIndex(p => p.pais === req.params.nombre);
-    if (index !== -1) {
-        paises.splice(index, 1);
-        fs.writeFileSync('./data/countries.json', JSON.stringify(paises));
-    }
-    res.sendStatus(204);
 });
 
-app.listen(port, () => {
-    console.log(`Servidor escuchando en el puerto http://localhost:${port}`);
+// GET /paises/idioma/:idioma - Obtener países por idioma
+app.get('/paises/idioma/:idioma', async (req, res) => {
+    try {
+        const data = await readData();
+        const paisesFiltrados = filtrarPaisesPorIdioma(data, req.params.idioma);
+        
+        if (paisesFiltrados.length === 0) {
+            return res.status(404).json({ 
+                mensaje: `No se encontraron países que hablen ${req.params.idioma}`
+            });
+        }
+        
+        res.json(paisesFiltrados);
+    } catch (error) {
+        res.status(500).json({ error: 'Error al leer los datos' });
+    }
 });
 
+// GET /paises/:nombre - Obtener un país específico
+app.get('/paises/:nombre', async (req, res) => {
+    try {
+        const data = await readData();
+        const pais = data.find(p => 
+            p.pais.toLowerCase() === req.params.nombre.toLowerCase()
+        );
+        
+        if (!pais) {
+            return res.status(404).json({ error: 'País no encontrado' });
+        }
+        
+        res.json(pais);
+    } catch (error) {
+        res.status(500).json({ error: 'Error al leer los datos' });
+    }
+});
 
+// POST /paises - Crear un nuevo país
+app.post('/paises', async (req, res) => {
+    try {
+        const data = await readData();
+        const nuevoPais = req.body;
+        
+        // Validación básica
+        if (!nuevoPais.pais || !nuevoPais.idioma || !nuevoPais.continente) {
+            return res.status(400).json({ 
+                error: 'Faltan datos requeridos (pais, idioma, continente)' 
+            });
+        }
+        
+        // Verificar si el país ya existe
+        const paisExistente = data.find(p => 
+            p.pais.toLowerCase() === nuevoPais.pais.toLowerCase()
+        );
+        
+        if (paisExistente) {
+            return res.status(400).json({ error: 'El país ya existe' });
+        }
+        
+        data.push(nuevoPais);
+        await writeData(data);
+        
+        res.status(201).json(nuevoPais);
+    } catch (error) {
+        res.status(500).json({ error: 'Error al guardar los datos' });
+    }
+});
 
+// DELETE /paises/:nombre - Eliminar un país
+app.delete('/paises/:nombre', async (req, res) => {
+    try {
+        const data = await readData();
+        const paisIndex = data.findIndex(p => 
+            p.pais.toLowerCase() === req.params.nombre.toLowerCase()
+        );
+        
+        if (paisIndex === -1) {
+            return res.status(404).json({ error: 'País no encontrado' });
+        }
+        
+        data.splice(paisIndex, 1);
+        await writeData(data);
+        
+        res.json({ mensaje: 'País eliminado correctamente' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error al eliminar los datos' });
+    }
+});
 
+app.listen(PORT, () => {
+    console.log(`Servidor corriendo en http://localhost:${PORT}`);
+});
